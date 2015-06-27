@@ -1,7 +1,8 @@
 scale_mult = 0.3;
+zoom = 1.0;
 circle_radius = 0.1;
 frame_period = 10;
-create_period = 25;
+create_period = 250;
 repforce = 0.002;
 connforce = 0.02;
 dims = 3;
@@ -111,10 +112,14 @@ function physics() {
 }
 
 function start() {
-    // S4
+    // Identity and inverses
     rules.push(['e', '']);
-    rules.push(['aA', 'e']);
-    rules.push(['Aa', 'e']);
+    for (var gen in generators) {
+        rules.push([gen + gen.toUpperCase(), 'e'])
+        rules.push([gen.toUpperCase() + gen, 'e'])
+    }
+
+    // S4
     rules.push(['bb', 'e']);
     rules.push(['B', 'b']);
     rules.push(['aaa', 'A']);
@@ -128,12 +133,6 @@ function start() {
     rules.push(['Abaab', 'baaba']);
 
 //     // D5
-//     rules.push(['e', '']);
-//     rules.push(['aA', 'e']);
-//     rules.push(['Aa', 'e']);
-//     rules.push(['Bb', 'e']);
-//     rules.push(['bB', 'b']);
-
 //     rules.push(['aaa', 'AA']);
 //     rules.push(['AAA', 'aa']);
 
@@ -264,15 +263,24 @@ function draw_frame(frame) {
     }
     physics();
 
+    var sum_norm_sq = 0;
+    var num_els = 0;
+    for (var key in elements) {
+        sum_norm_sq += vec_norm(elements[key].pos.slice(0, 2))
+        num_els++;
+    }
+    var stdev = Math.sqrt(sum_norm_sq / num_els);
+    zoom = Math.pow(zoom, 0.99) * Math.pow(stdev, 0.01);
+
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
-    var scale = Math.min(canvas.width, canvas.height) * scale_mult;
+    var scale = Math.min(canvas.width, canvas.height) * scale_mult / zoom;
     ctx.setTransform(scale, 0, 0, scale, canvas.width/2, canvas.height/2);
     ctx.font = '0.1px sans-serif';
 
     // Fill background.
     ctx.fillStyle = 'white';
-    ctx.fillRect(-5, -5, 10, 10);
+    ctx.fillRect(-5*zoom, -5*zoom, 10*zoom, 10*zoom);
 
     // Draw edges.
 //     ctx.lineWidth = 1/scale;
@@ -296,7 +304,8 @@ function draw_frame(frame) {
             ctx.beginPath();
             draw_vector(ctx, [xlen, ylen],
                         [x + circle_radius * Math.cos(angle),
-                         y + circle_radius * Math.sin(angle)]);
+                         y + circle_radius * Math.sin(angle)],
+                        simplify_key(gen + gen) != '');
             ctx.strokeStyle = generators[gen];
             ctx.stroke();
         }
@@ -395,16 +404,22 @@ function mat_vec_mult(A, x) {
     return Ax;
 }
 
-function draw_vector(ctx, v, origin) {
+function draw_vector(ctx, v, origin, with_arrow) {
     if (origin === undefined) {
         origin = [0, 0];
     }
+    if (with_arrow === undefined) {
+        with_arrow = true;
+    }
     ctx.moveTo(origin[0], origin[1]);
 
-    var Tv1 = vec_normalize(mat_vec_mult([[-0.5, 0.5], [-0.5, -0.5]], v), 0.05);
-    var Tv2 = vec_normalize(mat_vec_mult([[-0.5, -0.5], [0.5, -0.5]], v), 0.05);
     ctx.lineTo(v[0] + origin[0], v[1] + origin[1]);
-    ctx.lineTo(v[0] + Tv1[0] + origin[0], v[1] + Tv1[1] + origin[1]);
-    ctx.moveTo(v[0] + origin[0], v[1] + origin[1]);
-    ctx.lineTo(v[0] + Tv2[0] + origin[0], v[1] + Tv2[1] + origin[1]);
+
+    if (with_arrow) {
+        var Tv1 = vec_normalize(mat_vec_mult([[-0.5, 0.5], [-0.5, -0.5]], v), 0.05);
+        var Tv2 = vec_normalize(mat_vec_mult([[-0.5, -0.5], [0.5, -0.5]], v), 0.05);
+        ctx.lineTo(v[0] + Tv1[0] + origin[0], v[1] + Tv1[1] + origin[1]);
+        ctx.moveTo(v[0] + origin[0], v[1] + origin[1]);
+        ctx.lineTo(v[0] + Tv2[0] + origin[0], v[1] + Tv2[1] + origin[1]);
+    }
 }
