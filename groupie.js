@@ -1,9 +1,11 @@
 scale_mult = 0.3;
 circle_radius = 0.1;
-frame_period = 20;
+frame_period = 10;
+create_period = 400;
 repforce = 0.001;
 connforce = 0.02;
 dims = 3;
+maxnodes = 26;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -21,6 +23,12 @@ twelve = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
           AbA: {a: 'bA', A: 'abA', b: 'ab', B: 'ab'}
          };
 
+twelverules = [
+    ['aaa', 'e'],
+    ['bb', 'e'],
+    ['ababab', 'e']
+];
+
 // S3
 s3 = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
       a: {a: 'A', A: 'e', b: 'Ab', B: 'Ab'},
@@ -37,7 +45,8 @@ a4 = {e: {a: 'a', A: 'a', b: 'b', B: 'b'},
       ab: {a: 'b', A: 'b', b: 'a', B: 'a'}
      };
 
-elements = twelve;
+elements = {};
+rules = [];
 
 function physics() {
     // Prepare the new positions.
@@ -83,7 +92,7 @@ function physics() {
         center = vec_add(center, elements[key].newpos);
         count++;
     }
-    center = scal_vec_mult(1/count, center);
+    center = scal_vec_mult(0.01/count, center);
     for (var key in elements) {
         elements[key].pos = vec_sub(elements[key].newpos, center);
     }
@@ -101,27 +110,97 @@ function physics() {
     }
 }
 
-function draw() {
-    for (var key in elements) {
-        var pos = [];
-        for (var i = 0; i < dims; i++) {
-            pos[i] = Math.random()*2 - 1;
-        }
-        elements[key].pos = pos;
-    }
+function start() {
+    rules.push(['e', '']);
+    rules.push(['aA', 'e']);
+    rules.push(['Aa', 'e']);
+    rules.push(['bb', 'e']);
+    rules.push(['B', 'b']);
+    rules.push(['aaa', 'A']);
+    rules.push(['AA', 'aa']);
 
+    rules.push(['bab', 'AbA']);
+    rules.push(['bAb', 'aba']);
+    rules.push(['aabaab', 'baabaa']);
+    rules.push(['abaaba', 'baab']);
+    rules.push(['baabA', 'abaab']);
+    rules.push(['Abaab', 'baaba']);
+
+    create_element('e');
     draw_frame(0);
 }
 
+function simplify_key(key) {
+    var matched = true;
+    while (matched) {
+        matched = false;
+        for (var i = 0; i < rules.length; i++) {
+            rep = key.replace(rules[i][0], rules[i][1]);
+            if (rep !== key) {
+                matched = true;
+            }
+            key = rep;
+        }
+    }
+    return key;
+}
+
+function create_element(key, near) {
+    key = simplify_key(key);
+    if (elements[key] !== undefined) return;
+    el = {};
+    el.pos = [];
+    for (var i = 0; i < dims; i++) {
+        if (near === undefined) {
+            el.pos[i] = Math.random()*2 - 1;
+        } else {
+            nearpos = elements[near].pos;
+            el.pos[i] = nearpos[i] + Math.random()*0.2 - 0.1;
+        }
+    }
+    elements[key] = el;
+}
+
+function link_elements(k1, k2, gen) {
+    k1 = simplify_key(k1);
+    k2 = simplify_key(k2);
+    if (elements[k1][gen] === undefined) {
+        elements[k1][gen] = k2;
+    }
+}
+
+function create_nodes() {
+    q = [];
+    for (var key in elements) {
+        q.push(key);
+    }
+
+    if (q.length >= maxnodes) return;
+    for (var i = 0; i < q.length; i++) {
+        key = q[i];
+        for (var gen in generators) {
+            create_element(gen + key, key);
+            link_elements(key, gen + key, gen);
+            link_elements(gen + key, key, gen.toUpperCase());
+            create_element(gen.toUpperCase() + key, key);
+            link_elements(key, gen.toUpperCase() + key, gen.toUpperCase());
+            link_elements(gen.toUpperCase() + key, key, gen);
+        }
+    }
+}
+
 function draw_frame(frame) {
-    // Do physics.
+    // Create nodes and do physics.
+    if (frame % create_period == 0) {
+        create_nodes();
+    }
     physics();
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
     var scale = Math.min(canvas.width, canvas.height) * scale_mult;
     ctx.setTransform(scale, 0, 0, scale, canvas.width/2, canvas.height/2);
-    ctx.font = '0.1px sans-serif';
+    ctx.font = '0.05px sans-serif';
 
     // Fill background.
     ctx.fillStyle = 'white';
@@ -161,13 +240,8 @@ function draw_frame(frame) {
         var x = el.pos[0];
         var y = el.pos[1];
 
-//         ctx.beginPath();
-//         ctx.arc(x, y, 0.1, 0, 2*Math.PI);
-//         ctx.fillStyle = 'white';
-//         ctx.fill();
-//         ctx.strokeStyle = 'black';
-//         ctx.stroke();
         ctx.fillStyle = 'black';
+        if (key == '') key = 'e';
         ctx.fillText(key, x - key.length*0.03, y + 0.03);
     }
 
@@ -228,12 +302,15 @@ function scal_vec_mult(a, v) {
     return av;
 }
 
-function vec_normalize(v) {
+function vec_normalize(v, scale) {
+    if (scale === undefined) {
+        scale = 1;
+    }
     var norm = vec_norm(v);
     if (norm == 0) {
         return v;
     } else {
-        return scal_vec_mult(1/norm, v);
+        return scal_vec_mult(scale/norm, v);
     }
 }
 
@@ -254,10 +331,10 @@ function draw_vector(ctx, v, origin) {
     }
     ctx.moveTo(origin[0], origin[1]);
 
-    var Tv1 = mat_vec_mult([[0.9, -0.1], [0.1, 0.9]], v);
-    var Tv2 = mat_vec_mult([[0.9, 0.1], [-0.1, 0.9]], v);
+    var Tv1 = vec_normalize(mat_vec_mult([[-0.5, 0.5], [-0.5, -0.5]], v), 0.05);
+    var Tv2 = vec_normalize(mat_vec_mult([[-0.5, -0.5], [0.5, -0.5]], v), 0.05);
     ctx.lineTo(v[0] + origin[0], v[1] + origin[1]);
-    ctx.lineTo(Tv1[0] + origin[0], Tv1[1] + origin[1]);
+    ctx.lineTo(v[0] + Tv1[0] + origin[0], v[1] + Tv1[1] + origin[1]);
     ctx.moveTo(v[0] + origin[0], v[1] + origin[1]);
-    ctx.lineTo(Tv2[0] + origin[0], Tv2[1] + origin[1]);
+    ctx.lineTo(v[0] + Tv2[0] + origin[0], v[1] + Tv2[1] + origin[1]);
 }
