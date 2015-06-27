@@ -1,50 +1,16 @@
-scale_mult = 0.3;
+scale_mult = 0.35;
 zoom = 1.0;
 circle_radius = 0.1;
 frame_period = 10;
-create_period = 250;
+create_period = 50;
 repforce = 0.002;
 connforce = 0.02;
 dims = 3;
-maxnodes = 20;
+maxnodes = 128;
 
-generators = {a: 'red', b: 'green'};
-// 3x2 12-group
-twelve = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
-          a: {a: 'A', A: 'e', b: 'ba', B: 'ba'},
-          A: {a: 'e', A: 'a', b: 'bA', B: 'bA'},
-          b: {a: 'ab', A: 'Ab', b: 'e', B: 'e'},
-          ab: {a: 'Ab', A: 'b', b: 'AbA', B: 'AbA'},
-          Ab: {a: 'b', A: 'ab', b: 'aba', B: 'aba'},
-          ba: {a: 'aba', A: 'Aba', b: 'a', B: 'a'},
-          aba: {a: 'Aba', A: 'ba', b: 'Ab', B: 'Ab'},
-          Aba: {a: 'ba', A: 'aba', b: 'abA', B: 'abA'},
-          bA: {a: 'abA', A: 'AbA', b: 'A', B: 'A'},
-          abA: {a: 'AbA', A: 'bA', b: 'Aba', B: 'Aba'},
-          AbA: {a: 'bA', A: 'abA', b: 'ab', B: 'ab'}
-         };
-
-twelverules = [
-    ['aaa', 'e'],
-    ['bb', 'e'],
-    ['ababab', 'e']
-];
-
-// S3
-s3 = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
-      a: {a: 'A', A: 'e', b: 'Ab', B: 'Ab'},
-      A: {a: 'e', A: 'a', b: 'ab', B: 'ab'},
-      b: {a: 'ab', A: 'Ab', b: 'e', B: 'e'},
-      ab: {a: 'Ab', A: 'b', b: 'A', B: 'A'},
-      Ab: {a: 'b', A: 'ab', b: 'a', B: 'a'},
-     };
-
-// Abelian 4
-a4 = {e: {a: 'a', A: 'a', b: 'b', B: 'b'},
-      a: {a: 'e', A: 'e', b: 'ab', B: 'ab'},
-      b: {a: 'ab', A: 'ab', b: 'e', B: 'e'},
-      ab: {a: 'b', A: 'b', b: 'a', B: 'a'}
-     };
+generators = {a: 'blue', b: 'green'};
+// generators = {a: 'red', b: 'green', c: 'blue'};
+// generators = {a: 'red', b: 'green', c: 'blue', d: 'yellow'};
 
 elements = {};
 rules = {};
@@ -174,6 +140,34 @@ function reconcile_rule(left, right) {
     return count;
 }
 
+function join_elements(to, from) {
+    if (to === undefined ||
+        from === undefined ||
+        to === from ||
+        elements[to] === undefined ||
+        elements[from] === undefined) return;
+    if (to.length > from.length ||
+        (to.length == from.length &&
+         invert(to) > invert(from))) {
+        var tmp = from;
+        from = to;
+        to = tmp;
+    }
+
+    console.log(from + ' -> ' + to);
+    // Add a rule to simplify the algebra in the future.
+    rules[from] = to;
+
+    toel = elements[to];
+    fromel = elements[from];
+    delete elements[from];
+
+    for (var gen in generators) {
+        join_elements(toel[gen], fromel[gen]);
+        join_elements(toel[gen.toUpperCase()], fromel[gen.toUpperCase()]);
+    }
+}
+
 function start() {
     // Identity and inverses
     rules['e'] = '';
@@ -183,47 +177,80 @@ function start() {
         rules[gen.toUpperCase() + gen] = 'e';
     }
 
-    rules['ab'] = 'ba';
+//     // Truncated tetrahedron
+//     rules['aaa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['ababab'] = 'e';
 
-    // D3
+//     // Truncated tetrahedron alternate
+//     rules['aaa'] = 'e';
+//     rules['bbb'] = 'e';
+//     rules['AbAb'] = 'e';
+
+    // Soccer ball
+    rules['aaaaa'] = 'e';
+    rules['bb'] = 'e';
+    rules['AbA'] = 'bab';
+
+//     // Abelian cube
+//     rules['aa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['cc'] = 'e';
+//     rules['ab'] = 'ba';
+//     rules['ac'] = 'ca';
+//     rules['bc'] = 'cb';
+
+//     // Abelian hypercube
+//     rules['aa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['cc'] = 'e';
+//     rules['dd'] = 'e';
+//     rules['ab'] = 'ba';
+//     rules['ac'] = 'ca';
+//     rules['bc'] = 'cb';
+//     rules['ad'] = 'da';
+//     rules['bd'] = 'db';
+//     rules['cd'] = 'dc';
+
+//     // Rectangular Loop
+//     rules['aaaaaaaaaaaa'] = 'e';
+//     rules['bbbb'] = 'e';
+//     rules['ab'] = 'ba';
+
+//     // Flat Loop
+//     rules['aaaaaaaaaaaa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['ab'] = 'ba';
+
+//     // D3
 //     rules['aaa'] = 'e';
 //     rules['bb'] = 'e';
 //     rules['bab'] = 'A';
 
+//     // S4
+//     rules['aaaa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['ababab'] = 'e';
+
+//     // S4 alternate
+//     rules['aaaa'] = 'e';
+//     rules['bbb'] = 'e';
+//     rules['aBaB'] = 'e';
+
+//     // S5
+//     rules['aaaaa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['abab'] = 'bAbA';
+
     // Reconcile all the rules.
-//     while (true) {
+    while (true) {
         var count = 0;
         for (var left in rules) {
             var right = rules[left];
             count += reconcile_rule(left, right);
         }
-//         if (count == 0) break;
-//     }
-
-//     // S4
-//     rules.push(['bb', 'e']);
-//     rules.push(['B', 'b']);
-//     rules.push(['aaa', 'A']);
-//     rules.push(['AA', 'aa']);
-
-//     rules.push(['bab', 'AbA']);
-//     rules.push(['bAb', 'aba']);
-//     rules.push(['aabaab', 'baabaa']);
-//     rules.push(['abaaba', 'baab']);
-//     rules.push(['baabA', 'abaab']);
-//     rules.push(['Abaab', 'baaba']);
-
-//     // D5
-//     rules.push(['aaa', 'AA']);
-//     rules.push(['AAA', 'aa']);
-
-//     rules.push(['bb', 'e']);
-//     rules.push(['B', 'b']);
-
-//     rules.push(['ab', 'bA']);
-//     rules.push(['aB', 'BA']);
-//     rules.push(['Ab', 'ba']);
-//     rules.push(['AB', 'Ba']);
+        if (count == 0) break;
+    }
 
     create_element('e');
     draw_frame(0);
@@ -302,6 +329,7 @@ function create_element(key, near) {
         if (near === undefined) {
             el.pos[i] = Math.random()*2 - 1;
         } else {
+            near = simplify_key(near);
             nearpos = elements[near].pos;
             el.pos[i] = nearpos[i] + Math.random()*0.1 - 0.05;
         }
@@ -312,9 +340,17 @@ function create_element(key, near) {
 function link_elements(k1, k2, gen) {
     k1 = simplify_key(k1);
     k2 = simplify_key(k2);
-    if (elements[k1][gen] === undefined) {
-        elements[k1][gen] = k2;
+
+    el1 = elements[k1];
+    if (el1[gen] === undefined) {
+        el1[gen] = k2;
+    } else if (el1[gen] != k2) {
+        join_elements(k2, el1[gen]);
     }
+
+    k1 = simplify_key(k1);
+    k2 = simplify_key(k2);
+    elements[k1][gen] = k2;
 }
 
 function create_nodes() {
@@ -351,13 +387,13 @@ function draw_frame(frame) {
         num_els++;
     }
     var stdev = Math.sqrt(sum_norm_sq / num_els);
-    zoom = Math.pow(zoom, 0.999) * Math.pow(stdev, 0.001);
+    zoom = Math.pow(zoom, 0.99) * Math.pow(stdev, 0.01);
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
     var scale = Math.min(canvas.width, canvas.height) * scale_mult / zoom;
     ctx.setTransform(scale, 0, 0, scale, canvas.width/2, canvas.height/2);
-    ctx.font = '0.1px sans-serif';
+    ctx.font = '0.04px sans-serif';
 
     // Fill background.
     ctx.fillStyle = 'white';
@@ -402,7 +438,7 @@ function draw_frame(frame) {
 
         ctx.fillStyle = 'black';
         key = display_key(key);
-        ctx.fillText(key, x - key.length*0.03, y + 0.03);
+        ctx.fillText(key, x - key.length*0.02, y + 0.02);
     }
 
     // Set timer for next frame.
