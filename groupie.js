@@ -1,9 +1,9 @@
 scale_mult = 0.3;
 circle_radius = 0.1;
 frame_period = 20;
-force = 0.1;
-trydist = 0.5;
-dims = 3;
+repforce = 0.001;
+connforce = 0.02;
+dims = 2;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -23,8 +23,8 @@ twelve = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
 
 // S3
 s3 = {e: {a: 'a', A: 'A', b: 'b', B: 'b'},
-      a: {a: 'A', A: 'e', b: 'ba', B: 'ba'},
-      A: {a: 'e', A: 'a', b: 'bA', B: 'bA'},
+      a: {a: 'A', A: 'e', b: 'Ab', B: 'Ab'},
+      A: {a: 'e', A: 'a', b: 'ab', B: 'ab'},
       b: {a: 'ab', A: 'Ab', b: 'e', B: 'e'},
       ab: {a: 'Ab', A: 'b', b: 'A', B: 'A'},
       Ab: {a: 'b', A: 'ab', b: 'a', B: 'a'},
@@ -37,7 +37,7 @@ a4 = {e: {a: 'a', A: 'a', b: 'b', B: 'b'},
       ab: {a: 'b', A: 'b', b: 'a', B: 'a'}
      };
 
-elements = s3;
+elements = twelve;
 
 function physics() {
     // Prepare the new positions.
@@ -51,6 +51,7 @@ function physics() {
         var pos = el.pos;
 
         for (var key2 in elements) {
+            if (key == key2) continue;
             var el2 = elements[key2];
             var pos2 = el2.pos;
 
@@ -65,9 +66,9 @@ function physics() {
                     break;
                 }
             }
-            var attr = force * (distnorm - trydist);
-            if (!connected) {
-                attr = Math.min(0, attr) * 0.1;
+            var attr = -repforce / (distnorm * distnorm);
+            if (connected) {
+                attr += connforce;
             }
 
             el.newpos = vec_add(el.newpos, scal_vec_mult(attr, dir));
