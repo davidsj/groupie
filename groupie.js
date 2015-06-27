@@ -1,11 +1,11 @@
 scale_mult = 0.3;
 circle_radius = 0.1;
 frame_period = 10;
-create_period = 400;
-repforce = 0.001;
+create_period = 25;
+repforce = 0.002;
 connforce = 0.02;
 dims = 3;
-maxnodes = 26;
+maxnodes = 256;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -99,7 +99,7 @@ function physics() {
 
     // Rotate
     if (dims == 3) {
-        var rotspeed = 0.01;
+        var rotspeed = 0.002;
         var rot =
             [[Math.cos(rotspeed), -Math.sin(rotspeed), 0],
              [0, 1, 0],
@@ -111,6 +111,7 @@ function physics() {
 }
 
 function start() {
+    // S4
     rules.push(['e', '']);
     rules.push(['aA', 'e']);
     rules.push(['Aa', 'e']);
@@ -125,6 +126,24 @@ function start() {
     rules.push(['abaaba', 'baab']);
     rules.push(['baabA', 'abaab']);
     rules.push(['Abaab', 'baaba']);
+
+//     // D5
+//     rules.push(['e', '']);
+//     rules.push(['aA', 'e']);
+//     rules.push(['Aa', 'e']);
+//     rules.push(['Bb', 'e']);
+//     rules.push(['bB', 'b']);
+
+//     rules.push(['aaa', 'AA']);
+//     rules.push(['AAA', 'aa']);
+
+//     rules.push(['bb', 'e']);
+//     rules.push(['B', 'b']);
+
+//     rules.push(['ab', 'bA']);
+//     rules.push(['aB', 'BA']);
+//     rules.push(['Ab', 'ba']);
+//     rules.push(['AB', 'Ba']);
 
     create_element('e');
     draw_frame(0);
@@ -145,6 +164,55 @@ function simplify_key(key) {
     return key;
 }
 
+function display_key(key) {
+    key = simplify_key(key);
+    if (key == '') return 'e';
+
+    var dkey = '';
+    var curgen = null;
+    var curcount = 0;
+    for (var i = 0; i < key.length; i++) {
+        if (key[i] != curgen) {
+            if (curgen !== null) {
+                dkey += expstr(curgen, curcount);
+            }
+            curgen = key[i];
+            curcount = 0;
+        }
+        curcount++;
+    }
+    if (curgen !== null) {
+        dkey += expstr(curgen, curcount);
+    }
+    return dkey;
+}
+
+function expstr(letter, n) {
+    var neg = false;
+    if (letter == letter.toUpperCase()) {
+        neg = true;
+        letter = letter.toLowerCase();
+    }
+    str = '';
+    if (n == 1 && !neg) return letter;
+    while (n > 0) {
+        digit = n % 10;
+        str = ['\u2070',
+               '\u00b9',
+               '\u00b2',
+               '\u00b3',
+               '\u2074',
+               '\u2075',
+               '\u2076',
+               '\u2077',
+               '\u2078',
+               '\u2079'][digit] + str;
+        n = Math.round((n - digit) / 10);
+    }
+    if (neg) str = '\u207b'+ str;
+    return letter + str;
+}
+
 function create_element(key, near) {
     key = simplify_key(key);
     if (elements[key] !== undefined) return;
@@ -155,7 +223,7 @@ function create_element(key, near) {
             el.pos[i] = Math.random()*2 - 1;
         } else {
             nearpos = elements[near].pos;
-            el.pos[i] = nearpos[i] + Math.random()*0.2 - 0.1;
+            el.pos[i] = nearpos[i] + Math.random()*0.1 - 0.05;
         }
     }
     elements[key] = el;
@@ -200,14 +268,15 @@ function draw_frame(frame) {
     var ctx = canvas.getContext('2d');
     var scale = Math.min(canvas.width, canvas.height) * scale_mult;
     ctx.setTransform(scale, 0, 0, scale, canvas.width/2, canvas.height/2);
-    ctx.font = '0.05px sans-serif';
+    ctx.font = '0.1px sans-serif';
 
     // Fill background.
     ctx.fillStyle = 'white';
     ctx.fillRect(-5, -5, 10, 10);
 
     // Draw edges.
-    ctx.lineWidth = 1/scale;
+//     ctx.lineWidth = 1/scale;
+    ctx.lineWidth = 0.01;
     for (var key in elements) {
         var el = elements[key];
         var pos = el.pos;
@@ -234,14 +303,15 @@ function draw_frame(frame) {
     }
 
     // Draw elements.
-    ctx.lineWidth = 1/scale;
+//     ctx.lineWidth = 1/scale;
+    ctx.lineWidth = 0.01;
     for (var key in elements) {
         var el = elements[key];
         var x = el.pos[0];
         var y = el.pos[1];
 
         ctx.fillStyle = 'black';
-        if (key == '') key = 'e';
+        key = display_key(key);
         ctx.fillText(key, x - key.length*0.03, y + 0.03);
     }
 
