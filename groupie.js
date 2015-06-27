@@ -1,8 +1,9 @@
-scale_mult = 0.2;
+scale_mult = 0.3;
 circle_radius = 0.1;
 frame_period = 20;
 force = 0.1;
 trydist = 0.5;
+dims = 3;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -36,7 +37,7 @@ a4 = {e: {a: 'a', A: 'a', b: 'b', B: 'b'},
       ab: {a: 'b', A: 'b', b: 'a', B: 'a'}
      };
 
-elements = twelve;
+elements = s3;
 
 function physics() {
     // Prepare the new positions.
@@ -48,17 +49,14 @@ function physics() {
     for (var key in elements) {
         var el = elements[key];
         var pos = el.pos;
-        var newpos = el.newpos;
 
         for (var key2 in elements) {
             var el2 = elements[key2];
             var pos2 = el2.pos;
-            var newpos2 = el2.newpos;
 
-            var xdist = pos2[0] - pos[0];
-            var ydist = pos2[1] - pos[1];
-            var angle = Math.atan2(ydist, xdist);
-            var dist = Math.sqrt(xdist*xdist + ydist*ydist);
+            var dist = vec_sub(pos2, pos);
+            var distnorm = vec_norm(dist);
+            var dir = vec_normalize(dist);
 
             var connected = false;
             for (gen in generators) {
@@ -67,15 +65,13 @@ function physics() {
                     break;
                 }
             }
-            var attr = force * (dist - trydist);
+            var attr = force * (distnorm - trydist);
             if (!connected) {
-                attr = Math.min(0, attr) * 2;
+                attr = Math.min(0, attr) * 0.1;
             }
 
-            newpos[0] += attr * Math.cos(angle);
-            newpos[1] += attr * Math.sin(angle);
-            newpos2[0] -= attr * Math.cos(angle);
-            newpos2[1] -= attr * Math.sin(angle);
+            el.newpos = vec_add(el.newpos, scal_vec_mult(attr, dir));
+            el2.newpos = vec_sub(el2.newpos, scal_vec_mult(attr, dir));
         }
     }
 
@@ -87,7 +83,11 @@ function physics() {
 
 function draw() {
     for (var key in elements) {
-        elements[key].pos = [Math.random()*2 - 1, Math.random()*2 - 1];
+        var pos = [];
+        for (var i = 0; i < dims; i++) {
+            pos[i] = Math.random()*2 - 1;
+        }
+        elements[key].pos = pos;
     }
 
     draw_frame(0);
@@ -111,6 +111,7 @@ function draw_frame(frame) {
     ctx.lineWidth = 1/scale;
     for (var key in elements) {
         var el = elements[key];
+        var pos = el.pos;
         var x = el.pos[0];
         var y = el.pos[1];
 
@@ -163,6 +164,23 @@ function mat_vec_mult(A, x) {
     return Ax;
 }
 
+function vec_norm(a) {
+    var norm_sq = 0;
+    for (var i = 0; i < a.length; i++) {
+        norm_sq += a[i] * a[i];
+    }
+    return Math.sqrt(norm_sq);
+}
+
+function vec_add(a, b) {
+    var add = [];
+    var dist_sq = 0;
+    for (var i = 0; i < a.length; i++) {
+        add[i] = a[i] + b[i];
+    }
+    return add;
+}
+
 function vec_sub(a, b) {
     var sub = [];
     var dist_sq = 0;
@@ -170,6 +188,23 @@ function vec_sub(a, b) {
         sub[i] = a[i] - b[i];
     }
     return sub;
+}
+
+function scal_vec_mult(a, v) {
+    var av = [];
+    for (var i = 0; i < v.length; i++) {
+        av[i] = a * v[i];
+    }
+    return av;
+}
+
+function vec_normalize(v) {
+    var norm = vec_norm(v);
+    if (norm == 0) {
+        return v;
+    } else {
+        return scal_vec_mult(1/norm, v);
+    }
 }
 
 function draw_vector(ctx, v, origin) {
