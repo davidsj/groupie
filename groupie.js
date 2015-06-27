@@ -3,7 +3,7 @@ circle_radius = 0.1;
 frame_period = 20;
 repforce = 0.001;
 connforce = 0.02;
-dims = 2;
+dims = 3;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -76,9 +76,28 @@ function physics() {
         }
     }
 
-    // Assign the new positions, putting identity center.
+    // Assign the new positions relative to center of mass.
+    var center = zero_vec(dims);
+    var count = 0;
     for (var key in elements) {
-        elements[key].pos = vec_sub(elements[key].newpos, elements.e.newpos);
+        center = vec_add(center, elements[key].newpos);
+        count++;
+    }
+    center = scal_vec_mult(1/count, center);
+    for (var key in elements) {
+        elements[key].pos = vec_sub(elements[key].newpos, center);
+    }
+
+    // Rotate
+    if (dims == 3) {
+        var rotspeed = 0.01;
+        var rot =
+            [[Math.cos(rotspeed), -Math.sin(rotspeed), 0],
+             [0, 1, 0],
+             [Math.sin(rotspeed), 0, Math.cos(rotspeed)]];
+        for (var key in elements) {
+            elements[key].pos = mat_vec_mult(rot, elements[key].pos);
+        }
     }
 }
 
@@ -123,11 +142,13 @@ function draw_frame(frame) {
             var xlen = target_pos[0] - x;
             var ylen = target_pos[1] - y;
             var angle = Math.atan2(ylen, xlen);
-            xlen -= circle_radius * Math.cos(angle);
-            ylen -= circle_radius * Math.sin(angle);
+            xlen -= circle_radius * 2 * Math.cos(angle);
+            ylen -= circle_radius * 2 * Math.sin(angle);
 
             ctx.beginPath();
-            draw_vector(ctx, [xlen, ylen], [x, y]);
+            draw_vector(ctx, [xlen, ylen],
+                        [x + circle_radius * Math.cos(angle),
+                         y + circle_radius * Math.sin(angle)]);
             ctx.strokeStyle = generators[gen];
             ctx.stroke();
         }
@@ -140,12 +161,12 @@ function draw_frame(frame) {
         var x = el.pos[0];
         var y = el.pos[1];
 
-        ctx.beginPath();
-        ctx.arc(x, y, 0.1, 0, 2*Math.PI);
-        ctx.fillStyle = 'white';
-        ctx.fill();
-        ctx.strokeStyle = 'black';
-        ctx.stroke();
+//         ctx.beginPath();
+//         ctx.arc(x, y, 0.1, 0, 2*Math.PI);
+//         ctx.fillStyle = 'white';
+//         ctx.fill();
+//         ctx.strokeStyle = 'black';
+//         ctx.stroke();
         ctx.fillStyle = 'black';
         ctx.fillText(key, x - key.length*0.03, y + 0.03);
     }
@@ -182,6 +203,14 @@ function vec_add(a, b) {
     return add;
 }
 
+function zero_vec(n) {
+    var v = [];
+    for (var i = 0; i < n; i++) {
+        v[i] = 0;
+    }
+    return v;
+}
+
 function vec_sub(a, b) {
     var sub = [];
     var dist_sq = 0;
@@ -206,6 +235,17 @@ function vec_normalize(v) {
     } else {
         return scal_vec_mult(1/norm, v);
     }
+}
+
+function mat_vec_mult(A, x) {
+    var Ax = [];
+    for (var i = 0; i < A.length; i++) {
+        Ax[i] = 0;
+        for (var j = 0; j < A[i].length; j++) {
+            Ax[i] += A[i][j] * x[j];
+        }
+    }
+    return Ax;
 }
 
 function draw_vector(ctx, v, origin) {
