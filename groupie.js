@@ -6,7 +6,7 @@ create_period = 250;
 repforce = 0.002;
 connforce = 0.02;
 dims = 3;
-maxnodes = 256;
+maxnodes = 20;
 
 generators = {a: 'red', b: 'green'};
 // 3x2 12-group
@@ -47,7 +47,7 @@ a4 = {e: {a: 'a', A: 'a', b: 'b', B: 'b'},
      };
 
 elements = {};
-rules = [];
+rules = {};
 
 function physics() {
     // Prepare the new positions.
@@ -111,26 +111,107 @@ function physics() {
     }
 }
 
-function start() {
-    // Identity and inverses
-    rules.push(['e', '']);
-    for (var gen in generators) {
-        rules.push([gen + gen.toUpperCase(), 'e'])
-        rules.push([gen.toUpperCase() + gen, 'e'])
+function invert(letters) {
+    str = '';
+    for (var i = letters.length - 1; i >= 0; i--) {
+        letter = letters[i];
+        if (letter == letter.toLowerCase()) {
+            str += letter.toUpperCase();
+        } else {
+            str += letter.toLowerCase();
+        }        
+    }
+    return str;
+}
+
+function reconcile_rule(left, right) {
+    // Permutes a rule to see what else can be learned from it.
+
+    // 0. Put equation in canonical form with identity on the right.
+    left = left + invert(right);
+    right = '';
+
+    // 1. Generate all rotations of the equation through left- and
+    // right-products.
+    var rots = [];
+    for (var start = 0; start <= left.length; start++) {
+        for (var end = start; end <= left.length; end++) {
+            eqleft = left.slice(start, end);
+            eqright = invert(left.slice(0, start)) + invert(left.slice(end));
+            rots.push([eqleft, eqright]);
+        }
     }
 
-    // S4
-    rules.push(['bb', 'e']);
-    rules.push(['B', 'b']);
-    rules.push(['aaa', 'A']);
-    rules.push(['AA', 'aa']);
+    // 2. Simplify each equation using existing rules.
+    for (var i = 0; i < rots.length; i++) {
+        eq = rots[i];
+        eq[0] = simplify_key(eq[0]);
+        eq[1] = simplify_key(eq[1]);
+    }
 
-    rules.push(['bab', 'AbA']);
-    rules.push(['bAb', 'aba']);
-    rules.push(['aabaab', 'baabaa']);
-    rules.push(['abaaba', 'baab']);
-    rules.push(['baabA', 'abaab']);
-    rules.push(['Abaab', 'baaba']);
+    // 3. For each equation, if the two sides are unequal, map the
+    // more complex one to the simpler one (through a strict ordering
+    // of all possible expressions).
+    var count = 0;
+    for (var i = 0; i < rots.length; i++) {
+        eqleft = rots[i][0];
+        eqright = rots[i][1];
+        if (eqleft == eqright) continue;
+
+        count++;
+        if (eqleft.length > eqright.length ||
+            (eqleft.length == eqright.length &&
+             invert(eqleft) > invert(eqright))) {
+            rules[eqleft] = eqright;
+            console.log(eqleft + ' = ' + eqright);
+        } else {
+            rules[eqright] = eqleft;
+            console.log(eqright + ' = ' + eqleft);
+        }
+    }
+
+    // Return the number of new rules added.
+    return count;
+}
+
+function start() {
+    // Identity and inverses
+    rules['e'] = '';
+    rules['E'] = '';
+    for (var gen in generators) {
+        rules[gen + gen.toUpperCase()] = 'e';
+        rules[gen.toUpperCase() + gen] = 'e';
+    }
+
+    rules['ab'] = 'ba';
+
+    // D3
+//     rules['aaa'] = 'e';
+//     rules['bb'] = 'e';
+//     rules['bab'] = 'A';
+
+    // Reconcile all the rules.
+//     while (true) {
+        var count = 0;
+        for (var left in rules) {
+            var right = rules[left];
+            count += reconcile_rule(left, right);
+        }
+//         if (count == 0) break;
+//     }
+
+//     // S4
+//     rules.push(['bb', 'e']);
+//     rules.push(['B', 'b']);
+//     rules.push(['aaa', 'A']);
+//     rules.push(['AA', 'aa']);
+
+//     rules.push(['bab', 'AbA']);
+//     rules.push(['bAb', 'aba']);
+//     rules.push(['aabaab', 'baabaa']);
+//     rules.push(['abaaba', 'baab']);
+//     rules.push(['baabA', 'abaab']);
+//     rules.push(['Abaab', 'baaba']);
 
 //     // D5
 //     rules.push(['aaa', 'AA']);
@@ -152,8 +233,8 @@ function simplify_key(key) {
     var matched = true;
     while (matched) {
         matched = false;
-        for (var i = 0; i < rules.length; i++) {
-            rep = key.replace(rules[i][0], rules[i][1]);
+        for (var left in rules) {
+            rep = key.replace(left, rules[left]);
             if (rep !== key) {
                 matched = true;
             }
@@ -270,7 +351,7 @@ function draw_frame(frame) {
         num_els++;
     }
     var stdev = Math.sqrt(sum_norm_sq / num_els);
-    zoom = Math.pow(zoom, 0.99) * Math.pow(stdev, 0.01);
+    zoom = Math.pow(zoom, 0.999) * Math.pow(stdev, 0.001);
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
