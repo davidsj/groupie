@@ -1,24 +1,29 @@
-scale_mult = 0.35;
+scale_mult = 0.25;
 zoom = 1.0;
 circle_radius = 0.1;
-frame_period = 10;
-create_period = 50;
-repforce = 0.002;
+frame_period = 1;
+create_period = 1;
+repforce = 0.004;
 connforce = 0.02;
 dims = 3;
-maxnodes = 128;
+maxnodes = 400;
+forcedecay = 1;//0.9995;
+momentum = .75;
 
-generators = {a: 'blue', b: 'green'};
+generators = {a: 'red', b: 'green'};
 // generators = {a: 'red', b: 'green', c: 'blue'};
 // generators = {a: 'red', b: 'green', c: 'blue', d: 'yellow'};
 
 elements = {};
 rules = {};
 
-function physics() {
+kq = [];
+kqi = 0;
+
+function physics(frame) {
     // Prepare the new positions.
     for (var key in elements) {
-        elements[key].newpos = elements[key].pos.slice();
+        elements[key].newvel = elements[key].vel.slice();
     }
 
     // Apply force.
@@ -46,9 +51,12 @@ function physics() {
             if (connected) {
                 attr += connforce;
             }
+            attr *= Math.pow(forcedecay, frame);
 
-            el.newpos = vec_add(el.newpos, scal_vec_mult(attr, dir));
-            el2.newpos = vec_sub(el2.newpos, scal_vec_mult(attr, dir));
+            attr *= Math.min(1, (frame - Math.max(el.frame, el2.frame)) / 10);
+
+            el.newvel = vec_add(el.newvel, scal_vec_mult(attr, dir));
+            el2.newvel = vec_sub(el2.newvel, scal_vec_mult(attr, dir));
         }
     }
 
@@ -56,12 +64,13 @@ function physics() {
     var center = zero_vec(dims);
     var count = 0;
     for (var key in elements) {
-        center = vec_add(center, elements[key].newpos);
+        center = vec_add(center, elements[key].pos);
         count++;
     }
     center = scal_vec_mult(0.01/count, center);
     for (var key in elements) {
-        elements[key].pos = vec_sub(elements[key].newpos, center);
+        elements[key].vel = scal_vec_mult(momentum, elements[key].newvel);
+        elements[key].pos = vec_sub(vec_add(elements[key].pos, elements[key].vel), center);
     }
 
     // Rotate
@@ -73,6 +82,7 @@ function physics() {
              [Math.sin(rotspeed), 0, Math.cos(rotspeed)]];
         for (var key in elements) {
             elements[key].pos = mat_vec_mult(rot, elements[key].pos);
+            elements[key].vel = mat_vec_mult(rot, elements[key].vel);
         }
     }
 }
@@ -187,10 +197,24 @@ function start() {
 //     rules['bbb'] = 'e';
 //     rules['AbAb'] = 'e';
 
-    // Soccer ball
+//     Soccer ball
     rules['aaaaa'] = 'e';
     rules['bb'] = 'e';
-    rules['AbA'] = 'bab';
+    rules['ababab'] = 'e';
+
+//     // Abelian free group
+//     rules['ab'] = 'ba';
+
+//     // 9x9, noncommutative with normal subgroups
+//     rules['aaaaa'] = 'AAAA';
+//     rules['bbbbb'] = 'BBBB';
+//     rules['abA'] = 'bbbb';
+//     rules['baB'] = 'aaaa';
+
+//     // 4x4, noncommutative with normal subgroups
+//     rules['aaaa'] = '';
+//     rules['bbbb'] = '';
+//     rules['ab'] = 'bbba';
 
 //     // Abelian cube
 //     rules['aa'] = 'e';
@@ -213,7 +237,7 @@ function start() {
 //     rules['cd'] = 'dc';
 
 //     // Rectangular Loop
-//     rules['aaaaaaaaaaaa'] = 'e';
+//     rules['aaaaaa'] = 'e';
 //     rules['bbbb'] = 'e';
 //     rules['ab'] = 'ba';
 
@@ -225,7 +249,7 @@ function start() {
 //     // D3
 //     rules['aaa'] = 'e';
 //     rules['bb'] = 'e';
-//     rules['bab'] = 'A';
+//     rules['baba'] = 'e';
 
 //     // S4
 //     rules['aaaa'] = 'e';
@@ -240,9 +264,11 @@ function start() {
 //     // S5
 //     rules['aaaaa'] = 'e';
 //     rules['bb'] = 'e';
-//     rules['abab'] = 'bAbA';
+//     rules['abababab'] = 'e';
+//     rules['ababAA'] = 'bAbaa';
+//     rules['baabAAbaabAA'] = 'e';
 
-    // Reconcile all the rules.
+//     Reconcile all the rules.
     while (true) {
         var count = 0;
         for (var left in rules) {
@@ -252,7 +278,7 @@ function start() {
         if (count == 0) break;
     }
 
-    create_element('e');
+    create_element('e', 0);
     draw_frame(0);
 }
 
@@ -320,21 +346,32 @@ function expstr(letter, n) {
     return letter + str;
 }
 
-function create_element(key, near) {
+function create_element(key, frame, near, gen) {
     key = simplify_key(key);
     if (elements[key] !== undefined) return;
     el = {};
+    el.frame = frame;
     el.pos = [];
+    el.vel = [];
     for (var i = 0; i < dims; i++) {
-        if (near === undefined) {
+        if (near === undefined || gen === undefined) {
             el.pos[i] = Math.random()*2 - 1;
         } else {
+            var ratio = i < 2 ? 1.0 : 0.1;
             near = simplify_key(near);
-            nearpos = elements[near].pos;
-            el.pos[i] = nearpos[i] + Math.random()*0.1 - 0.05;
+            nel = elements[near];
+            nearpos = nel.pos;
+            if (nel[invert(gen)] !== undefined) {
+                oppos = elements[nel[invert(gen)]].pos;
+                el.pos[i] = 2*nel.pos[i] - oppos[i];
+            } else {
+                el.pos[i] = nearpos[i] + (Math.random()*0.5 - 0.25) * ratio;
+            }
         }
+        el.vel[i] = 0;
     }
     elements[key] = el;
+    kq.push(key);
 }
 
 function link_elements(k1, k2, gen) {
@@ -353,32 +390,44 @@ function link_elements(k1, k2, gen) {
     elements[k1][gen] = k2;
 }
 
-function create_nodes() {
-    q = [];
-    for (var key in elements) {
-        q.push(key);
+function create_nodes(frame) {
+    if (kqi >= maxnodes) return;
+    key = kq[kqi];
+    if (key === undefined) return;
+    kqi++;
+    for (var gen in generators) {
+        create_element(gen + key, frame, key, gen);
+        link_elements(key, gen + key, gen);
+        link_elements(gen + key, key, gen.toUpperCase());
+        create_element(invert(gen) + key, frame, key, invert(gen));
+        link_elements(key, gen.toUpperCase() + key, gen.toUpperCase());
+        link_elements(gen.toUpperCase() + key, key, gen);
     }
+//     q = [];
+//     for (var key in elements) {
+//         q.push(key);
+//     }
 
-    if (q.length >= maxnodes) return;
-    for (var i = 0; i < q.length; i++) {
-        key = q[i];
-        for (var gen in generators) {
-            create_element(gen + key, key);
-            link_elements(key, gen + key, gen);
-            link_elements(gen + key, key, gen.toUpperCase());
-            create_element(gen.toUpperCase() + key, key);
-            link_elements(key, gen.toUpperCase() + key, gen.toUpperCase());
-            link_elements(gen.toUpperCase() + key, key, gen);
-        }
-    }
+//     if (q.length >= maxnodes) return;
+//     for (var i = 0; i < q.length; i++) {
+//         key = q[i];
+//         for (var gen in generators) {
+//             create_element(gen + key, frame, key);
+//             link_elements(key, gen + key, gen);
+//             link_elements(gen + key, key, gen.toUpperCase());
+//             create_element(gen.toUpperCase() + key, frame, key);
+//             link_elements(key, gen.toUpperCase() + key, gen.toUpperCase());
+//             link_elements(gen.toUpperCase() + key, key, gen);
+//         }
+//     }
 }
 
 function draw_frame(frame) {
     // Create nodes and do physics.
     if (frame % create_period == 0) {
-        create_nodes();
+        create_nodes(frame);
     }
-    physics();
+    physics(frame);
 
     var sum_norm_sq = 0;
     var num_els = 0;
@@ -387,7 +436,7 @@ function draw_frame(frame) {
         num_els++;
     }
     var stdev = Math.sqrt(sum_norm_sq / num_els);
-    zoom = Math.pow(zoom, 0.99) * Math.pow(stdev, 0.01);
+    zoom = Math.pow(zoom, 0.9) * Math.pow(stdev, 0.1);
 
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
